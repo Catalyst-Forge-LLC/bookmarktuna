@@ -48,7 +48,7 @@ Done. Start dragging! 🐟
 
 Because we already have [finetuna](https://github.com/Catalyst-Forge-LLC/finetuna) — same playful energy, same “make painful things delightful” philosophy.
 
-Made with ❤️ by AcmeGeek + Grok + a helpful friend.
+Made with ❤️ by AcmeGeek + Grok + Claude.
 
 **License:** MIT  
 **Status:** Actively used and maintained
