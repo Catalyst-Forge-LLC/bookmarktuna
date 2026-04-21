@@ -1,38 +1,58 @@
 # 🐟 Bookmarktuna
 
-**Drag & drop organizer for your X/Twitter bookmarks**  
-*(the finetuna-style tool you didn’t know you needed)*
+**The drag-and-drop bookmark organizer X (Twitter) should have shipped.**
 
-Tired of clicking **Share → Bookmark to Folder** a hundred times?  
-Bookmarktuna turns the painful X bookmarks page into something actually usable:
+Tired of the painful **Share → Bookmark to Folder** dance with hundreds (or thousands) of bookmarks?  
+Bookmarktuna turns the All Bookmarks page into a delightful, fast, and actually usable organizer.
 
-- **Drag any post** → drop it directly onto a folder in the sidebar  
-- **Click the blue bookmark icon** → instantly opens the folder picker (no more accidental removal)  
-- Works on **All Bookmarks** page only (exactly where you need it)
+### ✨ Key Features
 
-Perfect for people with hundreds (or thousands) of bookmarks.
+- **Floating draggable panel** — always visible, even after scrolling far down
+- **True drag & drop** — drag any post onto a folder in the panel (or onto the top tabs)
+- **Click the blue bookmark icon** — instantly opens the folder picker (no more accidental removal)
+- **Auto-hide organized posts** — cleaned-up list so you only see what still needs organizing
+- **Undo** — accidentally dropped in the wrong folder? Press `U` (or click the toast) within 8 seconds
+- **Keyboard shortcuts** — `1–9` to quick-file to your top folders, `H` to hide, `?` for help
+- **Create new folders** inline without leaving the flow
+- **Persistent cache** — your folders are remembered even after heavy scrolling
+- **Lightweight & fast** — uses direct GraphQL calls where possible
 
-## Installation (30 seconds)
+### 🚀 Installation (30 seconds)
 
-1. Install [Tampermonkey](https://www.tampermonkey.net/) (Chrome / Firefox / Edge / Safari)
-2. Click this direct install link:  
+1. Install [Tampermonkey](https://www.tampermonkey.net/) (Chrome, Firefox, Edge, Safari)
+2. Click this direct link to install:  
    **[Install Bookmarktuna](https://raw.githubusercontent.com/Catalyst-Forge-LLC/bookmarktuna/main/bookmarktuna.user.js)**
 3. Go to [x.com/i/bookmarks](https://x.com/i/bookmarks) and refresh
 
 Done. Start dragging! 🐟
 
-## Features
+### How to Use
 
-- Real drag-and-drop (no more buried menus)
-- Click-to-folder fallback (still works the old way too)
-- Auto-detects new posts as you scroll
-- Lightweight & self-updating
+- **Drag & drop** — Drag any post onto the floating panel or a top folder tab
+- **Click a folder** in the floating panel for instant assignment
+- **Blue bookmark icon** — click it to open the normal folder picker (improved behavior)
+- **Auto-hide** — successfully organized posts fade and hide automatically
+- **Undo** — press `U` or click the undo toast if you make a mistake
+- **Keyboard** — `1`–`9` for your top 9 folders, `H` to hide current post
 
-## Why the tuna?
+### Keyboard Shortcuts
+
+| Shortcut     | Action                          |
+|--------------|---------------------------------|
+| `1`–`9`      | Add to your top 9 folders       |
+| `H`          | Hide current post               |
+| `U`          | Undo last action                |
+| `?`          | Show this help                  |
+
+### Why Bookmarktuna?
 
 Because we already have [finetuna](https://github.com/Catalyst-Forge-LLC/finetuna) — same playful energy, same “make painful things delightful” philosophy.
 
+Made with ❤️ by AcmeGeek + Grok + a helpful friend.
+
+**License:** MIT  
+**Status:** Actively used and maintained
+
 ---
 
-Made with ❤️ by AcmeGeek + Grok  
-License: MIT
+*Enjoy finally being able to organize your bookmarks like a sane person.*
