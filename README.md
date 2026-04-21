@@ -12,7 +12,8 @@ Bookmarktuna turns the All Bookmarks page into a delightful, fast, and actually 
 - **Click the blue bookmark icon** — instantly opens the folder picker (no more accidental removal)
 - **Auto-hide organized posts** — cleaned-up list so you only see what still needs organizing
 - **Undo** — accidentally dropped in the wrong folder? Press `U` (or click the toast) within 8 seconds
-- **Keyboard shortcuts** — `1–9` to quick-file to your top folders, `H` to hide, `?` for help
+- **Pinned folders** — pin your most-used folders so they stay fixed at the top
+- **Keyboard shortcuts** — `1–9` and `0` to quick-file to pinned folders, `H` to hide, `?` for help
 - **Create new folders** inline without leaving the flow
 - **Persistent cache** — your folders are remembered even after heavy scrolling
 - **Lightweight & fast** — uses direct GraphQL calls where possible
@@ -29,17 +30,18 @@ Done. Start dragging! 🐟
 ### How to Use
 
 - **Drag & drop** — Drag any post onto the floating panel or a top folder tab
-- **Click a folder** in the floating panel for instant assignment
+- **Click a folder** in the floating panel to file the top visible post instantly
+- **Pin or unpin** folders with the pin icon in the panel
 - **Blue bookmark icon** — click it to open the normal folder picker (improved behavior)
 - **Auto-hide** — successfully organized posts fade and hide automatically
 - **Undo** — press `U` or click the undo toast if you make a mistake
-- **Keyboard** — `1`–`9` for your top 9 folders, `H` to hide current post
+- **Keyboard** — `1`–`9` and `0` for pinned folders, `H` to hide current post
 
 ### Keyboard Shortcuts
 
 | Shortcut     | Action                          |
 |--------------|---------------------------------|
-| `1`–`9`      | Add to your top 9 folders       |
+| `1`–`9`, `0` | Add to pinned folders 1–10      |
 | `H`          | Hide current post               |
 | `U`          | Undo last action                |
 | `?`          | Show this help                  |
@@ -56,3 +58,11 @@ Made with ❤️ by AcmeGeek + Grok + Claude.
 ---
 
 *Enjoy finally being able to organize your bookmarks like a sane person.*
+
+
+### Pinning
+
+- Click the pin icon on any folder in the floating panel to pin or unpin it
+- Pinned folders are shown first, alphabetically, with stable shortcut badges
+- Shortcut mapping is fixed: `1` through `9`, then `0` for the 10th pinned folder
+- Unpinned folders remain fully clickable and draggable, and still sort by recent use
