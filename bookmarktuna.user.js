@@ -18,7 +18,7 @@
 (function () {
     'use strict';
 
-    const VERSION = '4.10';
+    const VERSION = '4.11';
 
     const isAllBookmarksPage = /^\/i\/bookmarks\/?$/.test(location.pathname);
     if (!isAllBookmarksPage) {
@@ -64,6 +64,7 @@
     const STORAGE_KEY_FOLDERS = 'bookmarktuna:folders';
     const STORAGE_KEY_PANEL_POS = 'bookmarktuna:panel-pos';
     const STORAGE_KEY_FOLDER_USAGE = 'bookmarktuna:folder-usage'; // { [id]: lastUsedTimestamp }
+    const STORAGE_KEY_PINNED = 'bookmarktuna:pinned';
 
     const CHECK_TTL_MS = 1000 * 60 * 60 * 24 * 14; // 14 days
     const MAX_CONCURRENT = 3;
@@ -83,6 +84,7 @@
 
     let filedIndex = loadFiledIndex();
     let checkedIndex = loadCheckedIndex();
+    let pinnedFolders = loadJSON(STORAGE_KEY_PINNED, []);
     const inFlight = new Set();
 
     // ---------- storage ----------
@@ -112,6 +114,11 @@
     function saveFoldersToStorage() {
         const list = Object.values(folderCache).map(f => ({ id: f.id, name: f.name }));
         saveJSON(STORAGE_KEY_FOLDERS, list);
+    }
+
+    function savePins() {
+        pinnedFolders = Array.from(new Set((pinnedFolders || []).filter(Boolean)));
+        saveJSON(STORAGE_KEY_PINNED, pinnedFolders);
     }
 
     function loadPanelPos() { return loadJSON(STORAGE_KEY_PANEL_POS, null); }
@@ -417,8 +424,8 @@
         }
     }
 
-    // Recently-used tracker. Folders used recently bubble to the top so the
-    // ones you're actively working with are closest to the cursor.
+    // Recently-used tracker. Pinned folders stay fixed at the top for keyboard
+    // shortcuts, while unpinned folders still sort by recent use.
     let folderUsage = loadJSON(STORAGE_KEY_FOLDER_USAGE, {});
     function recordFolderUse(folderId) {
         if (!folderId) return;
@@ -426,14 +433,54 @@
         saveJSON(STORAGE_KEY_FOLDER_USAGE, folderUsage);
     }
 
+    function isPinned(folderId) {
+        return pinnedFolders.includes(folderId);
+    }
+
+    function togglePin(folderId) {
+        if (!folderId) return;
+        if (isPinned(folderId)) {
+            pinnedFolders = pinnedFolders.filter(id => id !== folderId);
+        } else {
+            pinnedFolders.push(folderId);
+        }
+        savePins();
+        if (floatingPanel) renderPanel();
+    }
+
+    function prunePins() {
+        const valid = new Set(Object.keys(folderCache));
+        const next = pinnedFolders.filter(id => valid.has(id));
+        if (next.length !== pinnedFolders.length) {
+            pinnedFolders = next;
+            savePins();
+        }
+    }
+
+    function getPinnedFolders() {
+        return Object.values(folderCache)
+            .filter(f => isPinned(f.id))
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .slice(0, 10);
+    }
+
+    function getUnpinnedFolders() {
+        return Object.values(folderCache)
+            .filter(f => !isPinned(f.id))
+            .sort((a, b) => {
+                const ua = folderUsage[a.id] || 0;
+                const ub = folderUsage[b.id] || 0;
+                if (ua !== ub) return ub - ua; // recent first
+                return a.name.localeCompare(b.name);
+            });
+    }
+
+    function getShortcutFolders() {
+        return getPinnedFolders();
+    }
+
     function getFolders() {
-        const all = Object.values(folderCache);
-        return all.sort((a, b) => {
-            const ua = folderUsage[a.id] || 0;
-            const ub = folderUsage[b.id] || 0;
-            if (ua !== ub) return ub - ua; // recent first
-            return a.name.localeCompare(b.name);
-        });
+        return [...getPinnedFolders(), ...getUnpinnedFolders()];
     }
 
     // ---------- toast / undo ----------
@@ -819,77 +866,126 @@
     function renderPanel() {
         if (!panelContent) return;
         panelContent.innerHTML = '';
+        prunePins();
 
-        const folders = getFolders();
+        const pinned = getPinnedFolders();
+        const unpinned = getUnpinnedFolders();
+        const allFolders = [...pinned, ...unpinned];
+
         const title = document.createElement('div');
         title.style.cssText = 'font-size:12px; color:#536471; margin-bottom:6px;';
-        title.textContent = folders.length
-            ? 'Drop on a folder to file:'
+        title.textContent = allFolders.length
+            ? 'Drop on a folder to file, or click to file the top visible post:'
             : 'No folders yet — they’ll populate as the page loads.';
         panelContent.appendChild(title);
 
-        // "+ New folder" row — expands into an inline input on click.
         panelContent.appendChild(buildNewFolderRow());
 
-        // Folder list. Two columns when there are enough folders to benefit
-        // from it; single column otherwise.
-        const useGrid = folders.length >= 6;
-        const grid = document.createElement('div');
-        grid.style.cssText = useGrid
-            ? 'display:grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px;'
-            : 'display:flex; flex-direction:column; gap:4px; margin-top: 4px;';
-        panelContent.appendChild(grid);
+        function makeSectionLabel(text) {
+            const el = document.createElement('div');
+            el.textContent = text;
+            el.style.cssText = 'margin:10px 0 6px; font-size:11px; font-weight:700; color:#536471; text-transform:uppercase; letter-spacing:.04em;';
+            return el;
+        }
 
-        folders.forEach((folder, idx) => {
+        function getPinnedBadgeLabel(idx) {
+            return idx === 9 ? '0' : String(idx + 1);
+        }
+
+        function makeFolderButton(folder, { pinnedIndex = -1 } = {}) {
+            const hasShortcut = pinnedIndex >= 0 && pinnedIndex < 10;
             const btn = document.createElement('div');
             btn.style.cssText = `
                 position: relative;
-                padding: 10px 14px 10px ${idx < 9 ? '28px' : '14px'};
-                background: #f8f9fa; border-radius: 8px; cursor: pointer;
-                border: 1px solid #e0e0e0;
+                padding: 10px 42px 10px ${hasShortcut ? '30px' : '14px'};
+                background: ${hasShortcut ? '#eef6ff' : '#f8f9fa'};
+                border-radius: 8px; cursor: pointer;
+                border: 1px solid ${hasShortcut ? '#b9daf7' : '#e0e0e0'};
                 font-size: 13px; line-height: 1.3;
                 overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
             `;
             btn.textContent = folder.name;
-            btn.title = `Folder ID: ${folder.id}${idx < 9 ? ` — press ${idx + 1} to file top post here` : ''}`;
+            btn.title = `Folder ID: ${folder.id}${hasShortcut ? ` — press ${getPinnedBadgeLabel(pinnedIndex)} to file top post here` : ''}`;
 
-            // Shortcut number badge for folders 1-9
-            if (idx < 9) {
+            if (hasShortcut) {
                 const badge = document.createElement('span');
-                badge.textContent = String(idx + 1);
+                badge.textContent = getPinnedBadgeLabel(pinnedIndex);
                 badge.style.cssText = `
                     position: absolute; left: 8px; top: 50%; transform: translateY(-50%);
                     display: inline-block; min-width: 14px; padding: 1px 4px;
-                    background: #e8f0fa; color: #1d9bf0; border-radius: 3px;
+                    background: #dcecff; color: #1d9bf0; border-radius: 3px;
                     font-family: ui-monospace, monospace; font-size: 10px; font-weight: 700;
                     text-align: center;
                 `;
                 btn.appendChild(badge);
             }
 
-            btn.addEventListener('click', () => {
-                if (!draggedPost) {
-                    showToast('Drag a post onto a folder to file it.', { duration: 2500 });
-                }
+            const pin = document.createElement('span');
+            pin.textContent = isPinned(folder.id) ? '📌' : '📍';
+            pin.title = isPinned(folder.id) ? 'Unpin folder' : 'Pin folder';
+            pin.style.cssText = `
+                position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+                opacity: 0.9; cursor: pointer; font-size: 14px;
+            `;
+            pin.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                togglePin(folder.id);
             });
-            btn.addEventListener('dragover', e => {
+            btn.appendChild(pin);
+
+            btn.addEventListener('click', () => {
+                const post = draggedPost || getTopVisiblePost();
+                if (!post) {
+                    showToast('No visible post to file.', { duration: 2500 });
+                    return;
+                }
+                const tweetId = tweetIdFromArticle(post);
+                if (!tweetId) return;
+                flashArticle(post);
+                fileTweet(tweetId, folder, post);
+            });
+
+            btn.addEventListener('dragover', (e) => {
                 if (!draggedPost) return;
                 e.preventDefault();
                 e.dataTransfer.dropEffect = 'move';
                 btn.style.backgroundColor = 'rgba(29, 155, 240, 0.2)';
             });
             btn.addEventListener('dragleave', () => { btn.style.backgroundColor = ''; });
-            btn.addEventListener('drop', e => {
+            btn.addEventListener('drop', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 btn.style.backgroundColor = '';
                 const post = draggedPost;
                 if (!post) return;
                 const tweetId = tweetIdFromArticle(post);
+                if (!tweetId) return;
                 fileTweet(tweetId, folder, post);
             });
-            grid.appendChild(btn);
-        });
+
+            return btn;
+        }
+
+        if (pinned.length) {
+            panelContent.appendChild(makeSectionLabel('Pinned'));
+            const pinnedList = document.createElement('div');
+            pinnedList.style.cssText = 'display:flex; flex-direction:column; gap:4px; margin-top:4px;';
+            pinned.forEach((folder, idx) => {
+                pinnedList.appendChild(makeFolderButton(folder, { pinnedIndex: idx }));
+            });
+            panelContent.appendChild(pinnedList);
+        }
+
+        if (unpinned.length) {
+            panelContent.appendChild(makeSectionLabel(pinned.length ? 'Other folders' : 'Folders'));
+            const unpinnedList = document.createElement('div');
+            unpinnedList.style.cssText = 'display:flex; flex-direction:column; gap:4px; margin-top:4px;';
+            unpinned.forEach(folder => {
+                unpinnedList.appendChild(makeFolderButton(folder));
+            });
+            panelContent.appendChild(unpinnedList);
+        }
     }
 
     // ---------- per-post "hide" button ----------
@@ -1004,10 +1100,10 @@
         const tag = (e.target && e.target.tagName) || '';
         if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable) return;
 
-        // 1–9 → file top-visible post into folder N
-        if (/^[1-9]$/.test(e.key)) {
-            const idx = parseInt(e.key, 10) - 1;
-            const folders = getFolders();
+        // 1–9 / 0 → file top-visible post into pinned folder N
+        if (/^[0-9]$/.test(e.key)) {
+            const idx = e.key === '0' ? 9 : parseInt(e.key, 10) - 1;
+            const folders = getShortcutFolders();
             if (idx >= folders.length) return;
             const article = getTopVisiblePost();
             if (!article) return;
@@ -1098,14 +1194,14 @@
             </div>
             <div style="display:grid; grid-template-columns:auto 1fr; gap:8px 16px;">
                 <kbd style="${kbdStyle()}">1</kbd><span>–</span>
-                <kbd style="${kbdStyle()}">9</kbd><span>File top-visible post into folder 1–9 (panel order)</span>
+                <kbd style="${kbdStyle()}">0</kbd><span>File top-visible post into pinned folder 1–9, then 0 for #10</span>
                 <kbd style="${kbdStyle()}">H</kbd><span>Hide top-visible post from All Bookmarks</span>
                 <kbd style="${kbdStyle()}">U</kbd><span>Undo last file / hide action</span>
                 <kbd style="${kbdStyle()}">?</kbd><span>Toggle this help</span>
                 <kbd style="${kbdStyle()}">Esc</kbd><span>Close this help</span>
             </div>
             <div style="margin-top:14px; font-size:12px; color:#536471;">
-                Recently used folders bubble to the top automatically, so “1” is usually the folder you just used.
+                Pinned folders keep fixed shortcut numbers. Unpinned folders still bubble by recent use.
             </div>
         `;
         // Override the grid layout for the horizontal 1-9 span
