@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Bookmarktuna - X Bookmarks Drag & Drop Organizer
 // @namespace    https://github.com/Catalyst-Forge-LLC/bookmarktuna
-// @version      2.1
-// @description  Drag any post onto a sidebar folder OR click the blue bookmark icon → instant folder picker. Makes organizing hundreds of bookmarks actually fun (finetuna-style).
+// @version      3.0
+// @description  Drag any post onto a top folder tab OR click the blue bookmark icon → instant folder picker. (v3.0: gentler click + stay on bookmarks page)
 // @author       AcmeGeek + Grok
 // @match        https://x.com/i/bookmarks*
 // @match        https://twitter.com/i/bookmarks*
@@ -18,12 +18,18 @@
 (function () {
     'use strict';
 
-    console.log('%c🐟 Bookmarktuna v2.1 loaded — drag & drop + click-to-folder ready', 'color:#1d9bf0; font-weight:bold; font-size:16px');
+    console.log('%c🐟 Bookmarktuna v3.0 ready — drag & drop + stay on bookmarks page', 'color:#1d9bf0; font-weight:bold; font-size:16px');
 
     let draggedPost = null;
-    let targetFolderName = null;
 
-    // ==================== CLICK-TO-FOLDER ====================
+    // Gentler click to reduce navigation side-effects
+    function simulateClick(element) {
+        if (!element) return;
+        element.scrollIntoView({ block: 'center', inline: 'center' });
+        element.click();
+    }
+
+    // CLICK-TO-FOLDER (unchanged)
     document.addEventListener('click', function (e) {
         const removeBtn = e.target.closest('[data-testid="removeBookmark"]');
         if (!removeBtn) return;
@@ -46,7 +52,7 @@
         }
     }, true);
 
-    // ==================== DRAG & DROP ====================
+    // DRAG & DROP
     function makePostsDraggable() {
         document.querySelectorAll('article:not([data-drag-enabled])').forEach(post => {
             post.dataset.dragEnabled = 'true';
@@ -54,23 +60,20 @@
 
             post.addEventListener('dragstart', (e) => {
                 draggedPost = post;
-                e.dataTransfer.effectAllowed = 'move';
-                console.log('📤 Bookmarktuna: Drag started');
             });
 
-            post.addEventListener('dragend', () => {
-                draggedPost = null;
-                targetFolderName = null;
-            });
+            post.addEventListener('dragend', () => { draggedPost = null; });
         });
     }
 
     function makeFoldersDroppable() {
-        const folderItems = document.querySelectorAll('a[role="link"], div[role="link"]');
-        
+        const folderItems = document.querySelectorAll('a[data-testid="pivot"]');
+
         folderItems.forEach(item => {
-            const text = (item.textContent || '').trim();
-            if (!text || text === 'All Bookmarks' || text.includes('Create')) return;
+            const nameSpan = item.querySelector('span') || item;
+            const text = (nameSpan.textContent || '').trim();
+
+            if (!text || text === 'All Bookmarks' || text.includes('Create') || text.includes('Search')) return;
 
             if (item.dataset.droppable) return;
             item.dataset.droppable = 'true';
@@ -78,22 +81,23 @@
             item.addEventListener('dragover', (e) => {
                 e.preventDefault();
                 e.dataTransfer.dropEffect = 'move';
-                item.style.backgroundColor = 'rgba(29, 155, 240, 0.15)';
+                item.style.backgroundColor = 'rgba(29, 155, 240, 0.2)';
+                item.style.borderBottom = '3px solid #1d9bf0';
             });
 
             item.addEventListener('dragleave', () => {
                 item.style.backgroundColor = '';
+                item.style.borderBottom = '';
             });
 
             item.addEventListener('drop', (e) => {
                 e.preventDefault();
                 item.style.backgroundColor = '';
+                item.style.borderBottom = '';
 
                 if (!draggedPost) return;
 
-                targetFolderName = text;
-                console.log(`📥 Bookmarktuna: Dropped on folder "${targetFolderName}"`);
-
+                const folderName = text;
                 const shareBtn = Array.from(draggedPost.querySelectorAll('button, div[role="button"]')).find(el => {
                     const label = el.getAttribute('aria-label') || '';
                     return label.toLowerCase().includes('share');
@@ -101,29 +105,27 @@
 
                 if (shareBtn) {
                     shareBtn.click();
-                    pollForFolderMenu(true);
+                    pollForFolderMenu(true, folderName);
                 }
             });
         });
     }
 
-    function pollForFolderMenu(autoSelect = false) {
+    function pollForFolderMenu(autoSelect = false, folderName = null) {
         let attempts = 0;
         const poll = setInterval(() => {
             attempts++;
             const menuItems = document.querySelectorAll('div[role="menuitem"], [role="menu"] div[role="button"]');
-            const folderOption = Array.from(menuItems).find(el =>
-                (el.textContent || '').includes('Bookmark to Folder')
-            );
+            const folderOption = Array.from(menuItems).find(el => (el.textContent || '').includes('Bookmark to Folder'));
 
             if (folderOption) {
                 clearInterval(poll);
                 folderOption.click();
 
-                if (autoSelect && targetFolderName) {
-                    setTimeout(() => autoSelectFolderInModal(targetFolderName), 120);
+                if (autoSelect && folderName) {
+                    setTimeout(() => autoSelectFolderInModal(folderName), 900);
                 }
-            } else if (attempts > 50) {
+            } else if (attempts > 60) {
                 clearInterval(poll);
             }
         }, 40);
@@ -133,22 +135,29 @@
         let attempts = 0;
         const poll = setInterval(() => {
             attempts++;
-            const items = document.querySelectorAll('div[role="menuitem"], div[role="listitem"]');
-            const target = Array.from(items).find(el =>
-                (el.textContent || '').trim() === folderName
-            );
+            const buttons = document.querySelectorAll('button[role="button"]');
+
+            const target = Array.from(buttons).find(btn => {
+                const text = (btn.textContent || '').trim();
+                return text === folderName || text.includes(folderName);
+            });
 
             if (target) {
                 clearInterval(poll);
-                target.click();
-                targetFolderName = null;
-            } else if (attempts > 30) {
+                simulateClick(target);
+
+                // Force stay on bookmarks page after successful add
+                setTimeout(() => {
+                    if (!window.location.pathname.includes('/i/bookmarks')) {
+                        window.location.href = 'https://x.com/i/bookmarks';
+                    }
+                }, 800);
+            } else if (attempts > 50) {
                 clearInterval(poll);
             }
-        }, 50);
+        }, 80);
     }
 
-    // Auto-refresh on infinite scroll
     const observer = new MutationObserver(() => {
         makePostsDraggable();
         makeFoldersDroppable();
@@ -159,6 +168,4 @@
         makePostsDraggable();
         makeFoldersDroppable();
     }, 1000);
-
-    console.log('%c✅ Bookmarktuna ready! Drag posts to sidebar folders or click the blue bookmark icon.', 'color:#1d9bf0');
 })();
